@@ -1,0 +1,75 @@
+on run {input, parameters}
+	-- Define the folder where text files will be stored
+	set folderPath to "<enter_folder_name_to_save_your_sessions_in_txt_files>"
+	
+	-- Show dialog to choose profile
+	set profileDialog to display dialog "Choose Chrome Profile:" buttons {"Personal (Default)", "Work (Profile 2)", "Cancel"} default button "Personal (Default)" cancel button "Cancel"
+	
+	-- Determine profile number based on button clicked
+	set buttonClicked to button returned of profileDialog
+	if buttonClicked is "Personal (Default)" then
+		set profileNumber to 1
+		set profileName to "Personal"
+	else if buttonClicked is "Work (Profile 2)" then
+		set profileNumber to 2
+		set profileName to "Work"
+	end if
+	
+	-- Ask for session name
+	set sessionDialog to display dialog "Enter session name:" default answer "" buttons {"Cancel", "Save"} default button "Save" cancel button "Cancel"
+	set fileName to text returned of sessionDialog
+	
+	-- Validate filename
+	if fileName is "" then
+		display dialog "Session name cannot be empty!" buttons {"OK"} default button "OK"
+		return
+	end if
+	
+	set filePath to folderPath & fileName & ".txt"
+	
+	-- Determine Chrome profile directory path
+	if profileNumber is 1 then
+		set profileDir to "Default"
+	else
+		set profileDir to "Profile " & profileNumber
+	end if
+	
+	-- Activate Chrome with the desired profile
+	set openTabCmd to "open -a 'Google Chrome' --args --profile-directory='" & profileDir & "' about:blank"
+	do shell script openTabCmd
+	delay 1
+	
+	-- Initialize URL list
+	set urlList to {}
+	
+	-- Get URLs from Chrome tabs
+	tell application "Google Chrome"
+		if (count of windows) = 0 then
+			display dialog "No Chrome windows are open." buttons {"OK"} default button "OK"
+			return
+		end if
+		
+		set chromeWindow to window 1
+		set tabCount to count of tabs in chromeWindow
+		
+		repeat with i from 1 to tabCount
+			set currentTab to tab i of chromeWindow
+			set tabURL to URL of currentTab
+			set end of urlList to tabURL
+		end repeat
+	end tell
+	
+	-- Convert URLs to text
+	set urlsText to ""
+	repeat with urlItem in urlList
+		set urlsText to urlsText & urlItem & linefeed
+	end repeat
+	
+	-- Save to file
+	do shell script "mkdir -p " & quoted form of POSIX path of folderPath
+	do shell script "echo " & quoted form of urlsText & " > " & quoted form of POSIX path of filePath
+	
+	display dialog "Saved " & (count of urlList) & " tabs from " & profileName & " profile to " & fileName & ".txt" buttons {"OK"} default button "OK"
+	
+	return "Session saved successfully"
+end run
