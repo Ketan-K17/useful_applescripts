@@ -1,0 +1,77 @@
+on run {input, parameters}
+	-- Define the folder where sessions are stored
+	set folderPath to "<enter_your_sessions_folder_path>"
+	
+	-- 1️⃣ Show dialog to choose profile
+	set profileDialog to display dialog "Choose Chrome Profile:" buttons {"Personal (Default)", "Work (Profile 2)", "Cancel"} default button "Personal (Default)" cancel button "Cancel"
+	
+	-- Determine profile number based on button clicked
+	set buttonClicked to button returned of profileDialog
+	if buttonClicked is "Personal (Default)" then
+		set profileNumber to 1
+		set profileName to "Personal"
+	else if buttonClicked is "Work (Profile 2)" then
+		set profileNumber to 2
+		set profileName to "Work"
+	end if
+	
+	-- 2️⃣ Get list of session files, sorted by modification date (most recent first)
+	try
+		set sessionFiles to do shell script "cd " & quoted form of POSIX path of folderPath & " && ls -t *.txt 2>/dev/null | sed 's/.txt$//'"
+	on error
+		display dialog "No session files found in: " & folderPath buttons {"OK"} default button "OK"
+		return
+	end try
+	
+	-- Convert to list
+	set AppleScript's text item delimiters to linefeed
+	set sessionList to paragraphs of sessionFiles
+	set AppleScript's text item delimiters to ""
+	
+	if (count of sessionList) is 0 then
+		display dialog "No session files found!" buttons {"OK"} default button "OK"
+		return
+	end if
+	
+	-- 3️⃣ Show dropdown to choose session
+	set chosenSession to choose from list sessionList with prompt "Select a session to restore:" default items {item 1 of sessionList} OK button name "Restore" cancel button name "Cancel"
+	
+	if chosenSession is false then
+		return -- User cancelled
+	end if
+	
+	set fileName to item 1 of chosenSession
+	
+	-- 4️⃣ Build file path & load URLs
+	set filePath to folderPath & fileName & ".txt"
+	try
+		set urlList to paragraphs of (do shell script "cat " & quoted form of POSIX path of filePath)
+	on error
+		display dialog "Error reading file: " & fileName & ".txt" buttons {"OK"} default button "OK"
+		return
+	end try
+	
+	-- 5️⃣ Map profile number to Chrome directory name
+	if profileNumber is 1 then
+		set profileDir to "Default"
+	else
+		set profileDir to "Profile " & profileNumber
+	end if
+	
+	-- 6️⃣ Open each URL in the selected profile
+	set urlCount to 0
+	repeat with u in urlList
+		set urlItem to contents of u
+		if urlItem is not "" then
+			set openCmd to "open -na 'Google Chrome' --args --profile-directory='" & profileDir & "' " & quoted form of urlItem
+			do shell script openCmd
+			set urlCount to urlCount + 1
+			delay 0.3
+		end if
+	end repeat
+	
+	-- 7️⃣ Done!
+	display dialog "Loaded " & urlCount & " URLs from '" & fileName & "' in " & profileName & " profile" buttons {"OK"} default button "OK"
+	
+	return "Session restored successfully"
+end run
